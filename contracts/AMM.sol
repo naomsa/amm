@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "hardhat/console.sol";
 
 contract AMM is ERC20("AMM v1", "AMM") {
   IERC20 public immutable token0;
@@ -41,10 +42,10 @@ contract AMM is ERC20("AMM v1", "AMM") {
 
     if (reserve0 > 0 || reserve1 > 0) require(reserve0 * amount1 == reserve1 * amount0, "x / y != dx / dy");
 
-    if (totalSupply() == 0) shares = _sqrt(amount0 * amount1);
-    else shares = _min((amount0 * totalSupply()) / reserve0, (amount1 * totalSupply()) / reserve1);
+    if (super.totalSupply() == 0) shares = _sqrt(amount0 * amount1);
+    else shares = _min((amount0 * super.totalSupply()) / reserve0, (amount1 * super.totalSupply()) / reserve1);
 
-    require(shares > 0, "shares = 0");
+    require(shares > 0, "shares == 0");
 
     super._mint(msg.sender, shares);
 
@@ -52,12 +53,14 @@ contract AMM is ERC20("AMM v1", "AMM") {
   }
 
   function removeLiquidity(uint256 shares) external returns (uint256 amount0, uint256 amount1) {
+    require(super.totalSupply() > 0, "totalSupply == 0");
+
     uint256 bal0 = token0.balanceOf(address(this));
     uint256 bal1 = token1.balanceOf(address(this));
 
-    amount0 = (shares * bal0) / totalSupply();
-    amount1 = (shares * bal1) / totalSupply();
-    require(amount0 > 0 && amount1 > 0, "amount0 or amount1 = 0");
+    amount0 = (shares * bal0) / super.totalSupply();
+    amount1 = (shares * bal1) / super.totalSupply();
+    require(amount0 > 0 && amount1 > 0, "amount0 or amount1 == 0");
 
     super._burn(msg.sender, shares);
     _update(bal0 - amount0, bal1 - amount1);
