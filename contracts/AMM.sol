@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import "./lib/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "hardhat/console.sol";
 
 contract AMM is ERC20("AMM v1", "AMM") {
   IERC20 public immutable token0;
@@ -40,10 +40,12 @@ contract AMM is ERC20("AMM v1", "AMM") {
     token0.transferFrom(msg.sender, address(this), amount0);
     token1.transferFrom(msg.sender, address(this), amount1);
 
-    if (reserve0 > 0 || reserve1 > 0) require(reserve0 * amount1 == reserve1 * amount0, "x / y != dx / dy");
-
-    if (super.totalSupply() == 0) shares = _sqrt(amount0 * amount1);
-    else shares = _min((amount0 * super.totalSupply()) / reserve0, (amount1 * super.totalSupply()) / reserve1);
+    if (super.totalSupply() == 0) {
+      shares = Math.sqrt(amount0 * amount1);
+    } else {
+      require(reserve0 / reserve1 == amount0 * amount1, "x / y != dx / dy");
+      shares = Math.min((amount0 * super.totalSupply()) / reserve0, (amount1 * super.totalSupply()) / reserve1);
+    }
 
     require(shares > 0, "shares == 0");
 
@@ -72,18 +74,5 @@ contract AMM is ERC20("AMM v1", "AMM") {
   function _update(uint256 _reserve0, uint256 _reserve1) internal {
     reserve0 = _reserve0;
     reserve1 = _reserve1;
-  }
-
-  function _sqrt(uint256 x) internal pure returns (uint256 y) {
-    uint256 z = (x + 1) / 2;
-    y = x;
-    while (z < y) {
-      y = z;
-      z = (x / z + z) / 2;
-    }
-  }
-
-  function _min(uint256 x, uint256 y) internal pure returns (uint256) {
-    return x < y ? x : y;
   }
 }
