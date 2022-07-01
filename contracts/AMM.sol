@@ -18,20 +18,15 @@ contract AMM is ERC20("AMM v1", "AMM") {
     token1 = IERC20(_token1);
   }
 
-  function swap(address tokenIn, uint256 amountIn) external returns (uint256 amountOut) {
-    require(tokenIn == address(token0) || tokenIn == address(token1), "invalid tokenIn");
+  function swap(address _tokenIn, uint256 amountIn) external returns (uint256 amountOut) {
+    require(_tokenIn == address(token0) || _tokenIn == address(token1), "invalid tokenIn");
     require(amountIn > 0, "amountIn == 0");
 
-    bool isToken0 = tokenIn == address(token0);
-    (IERC20 tokenOut, uint256 reserveIn, uint256 reserveOut) = isToken0
-      ? (token1, reserve0, reserve1)
-      : (token0, reserve1, reserve0);
+    (IERC20 tokenIn, IERC20 tokenOut, uint256 reserveIn, uint256 reserveOut) = _sort(_tokenIn);
 
-    IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+    tokenIn.transferFrom(msg.sender, address(this), amountIn);
 
-    amountOut = (reserveOut * amountIn) / (reserveIn + amountIn);
-
-    tokenOut.transfer(msg.sender, amountOut);
+    tokenOut.transfer(msg.sender, (amountOut = (reserveOut * amountIn) / (reserveIn + amountIn)));
 
     _update(token0.balanceOf(address(this)), token1.balanceOf(address(this)));
   }
@@ -74,5 +69,18 @@ contract AMM is ERC20("AMM v1", "AMM") {
   function _update(uint256 _reserve0, uint256 _reserve1) internal {
     reserve0 = _reserve0;
     reserve1 = _reserve1;
+  }
+
+  function _sort(address _tokenIn)
+    internal
+    view
+    returns (
+      IERC20 tokenIn,
+      IERC20 tokenOut,
+      uint256 reserveIn,
+      uint256 reserveOut
+    )
+  {
+    return _tokenIn == address(token0) ? (token0, token1, reserve0, reserve1) : (token1, token0, reserve1, reserve0);
   }
 }
