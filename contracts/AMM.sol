@@ -18,15 +18,24 @@ contract AMM is ERC20("AMM v1", "AMM") {
     token1 = IERC20(_token1);
   }
 
-  function swap(address _tokenIn, uint256 amountIn) external returns (uint256 amountOut) {
+  function swap(
+    address _tokenIn,
+    uint256 amountIn,
+    uint256 amountOutMin
+  ) external returns (uint256 amountOut) {
     require(_tokenIn == address(token0) || _tokenIn == address(token1), "invalid tokenIn");
+
     require(amountIn > 0, "amountIn == 0");
 
     (IERC20 tokenIn, IERC20 tokenOut, uint256 reserveIn, uint256 reserveOut) = _sort(_tokenIn);
 
     tokenIn.transferFrom(msg.sender, address(this), amountIn);
 
-    tokenOut.transfer(msg.sender, (amountOut = (reserveOut * amountIn) / (reserveIn + amountIn)));
+    require((amountOut = quote(amountIn, reserveIn, reserveOut)) > 0, "amountOut == 0");
+
+    require(amountOutMin == 0 || amountOut >= amountOutMin, "amountOut < amountOutMin");
+
+    tokenOut.transfer(msg.sender, amountOut);
 
     _update(token0.balanceOf(address(this)), token1.balanceOf(address(this)));
   }
@@ -64,6 +73,14 @@ contract AMM is ERC20("AMM v1", "AMM") {
 
     token0.transfer(msg.sender, amount0);
     token1.transfer(msg.sender, amount1);
+  }
+
+  function quote(
+    uint256 amountIn,
+    uint256 reserveIn,
+    uint256 reserveOut
+  ) public pure returns (uint256 amountOut) {
+    amountOut = (reserveOut * amountIn) / (reserveIn + amountIn);
   }
 
   function _update(uint256 _reserve0, uint256 _reserve1) internal {

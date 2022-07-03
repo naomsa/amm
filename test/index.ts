@@ -110,29 +110,58 @@ describe("AMM v1", () => {
     });
 
     it("Should correctly swap tokens", async () => {
-      const reserve0 = (await amm.reserve0()).toNumber();
-      const reserve1 = (await amm.reserve1()).toNumber();
+      const reserveIn = (await amm.reserve0()).toNumber();
+      const reserveOut = (await amm.reserve1()).toNumber();
       const amountIn = 25;
-      const amountOut = (reserve1 * amountIn) / (reserve0 + amountIn);
+      const amountOutMin = (
+        await amm.quote(amountIn, reserveIn, reserveOut)
+      ).toNumber();
 
-      await amm.connect(addr1).swap(token0.address, amountIn);
+      await amm.connect(addr1).swap(token0.address, amountIn, amountOutMin);
 
-      expect(await amm.reserve0()).to.equal(reserve0 + amountIn);
-      expect(await amm.reserve1()).to.equal(reserve1 - amountOut);
+      expect(await amm.reserve0()).to.equal(reserveIn + amountIn);
+      expect(await amm.reserve1()).to.equal(reserveOut - amountOutMin);
       expect(await token0.balanceOf(addr1.address)).to.equal(100 - amountIn);
-      expect(await token1.balanceOf(addr1.address)).to.equal(100 + amountOut);
+      expect(await token1.balanceOf(addr1.address)).to.equal(
+        100 + amountOutMin,
+      );
     });
 
     it("Should revert with invalid tokenIn", async () => {
       await expect(
-        amm.connect(addr1).swap(ethers.constants.AddressZero, 1),
+        amm.connect(addr1).swap(ethers.constants.AddressZero, 1, 0),
       ).to.be.revertedWith("invalid tokenIn");
     });
 
     it("Should revert when amountIn is zero", async () => {
       await expect(
-        amm.connect(addr1).swap(token0.address, 0),
+        amm.connect(addr1).swap(token0.address, 0, 0),
       ).to.be.revertedWith("amountIn == 0");
+    });
+
+    it("Should revert when amountOut is lower than amountOutMin", async () => {
+      const amountOutMin = (await amm.quote(10, 100, 100)).add(1); // expected 9
+      await expect(
+        amm.connect(addr1).swap(token0.address, 10, amountOutMin),
+      ).to.be.revertedWith("amountOut < amountOutMin");
+    });
+
+    it("Should swap when amountOutMin is zero", async () => {
+      const reserveIn = (await amm.reserve0()).toNumber();
+      const reserveOut = (await amm.reserve1()).toNumber();
+      const amountIn = 25;
+      const amountOutMin = (
+        await amm.quote(amountIn, reserveIn, reserveOut)
+      ).toNumber();
+
+      await amm.connect(addr1).swap(token0.address, amountIn, 0);
+
+      expect(await amm.reserve0()).to.equal(reserveIn + amountIn);
+      expect(await amm.reserve1()).to.equal(reserveOut - amountOutMin);
+      expect(await token0.balanceOf(addr1.address)).to.equal(100 - amountIn);
+      expect(await token1.balanceOf(addr1.address)).to.equal(
+        100 + amountOutMin,
+      );
     });
   });
 });
